@@ -7,17 +7,14 @@ const MAX_URL_LENGTH = 2048;
 function validateUrl(value) {
   const trimmedUrl = value.trim();
 
-  // 1. 빈 값 검사
   if (!trimmedUrl) {
     return "URL을 입력해 주세요.";
   }
 
-  // 2. 최대 길이 검사
   if (trimmedUrl.length > MAX_URL_LENGTH) {
     return "URL은 2048자 이하로 입력해 주세요.";
   }
 
-  // 3. http:// 또는 https:// 시작 여부 검사
   if (
     !trimmedUrl.startsWith("http://") &&
     !trimmedUrl.startsWith("https://")
@@ -25,7 +22,6 @@ function validateUrl(value) {
     return "URL은 http:// 또는 https://로 시작해야 합니다.";
   }
 
-  // 4. URL 형식 검사
   try {
     const parsedUrl = new URL(trimmedUrl);
 
@@ -64,14 +60,30 @@ export default function Home() {
 
     setIsLoading(true);
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 800);
-    });
+    try {
+      const response = await fetch("/api/shorten", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          originalUrl: originalUrl.trim(),
+        }),
+      });
 
-    setResult(
-      "입력값 검증이 완료되었습니다. 아직 Backend API와 연결되진 않았습니다."
-    );
-    setIsLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error?.message || "요청 처리에 실패했습니다.");
+        return;
+      }
+
+      setResult(data.shortUrl);
+    } catch {
+      setError("서버에 연결할 수 없습니다.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -81,9 +93,7 @@ export default function Home() {
 
         <div className="intro">
           <h1 id="page-title">URL Shortener</h1>
-          <p>
-            긴 URL을 입력하고, 안전하게 처리할 수 있는 값인지 확인해 보세요.
-          </p>
+          <p>긴 URL을 입력하고 단축 주소를 생성해 보세요.</p>
         </div>
 
         <form className="url-form" onSubmit={handleSubmit} noValidate>
@@ -104,7 +114,7 @@ export default function Home() {
             />
 
             <button type="submit" disabled={isLoading}>
-              {isLoading ? "Checking..." : "Shorten"}
+              {isLoading ? "처리 중..." : "Shorten"}
             </button>
           </div>
 
@@ -122,7 +132,7 @@ export default function Home() {
             {isLoading && (
               <p className="message message-loading" role="status">
                 <span className="spinner" aria-hidden="true" />
-                입력한 URL을 확인하고 있습니다.
+                단축 주소를 생성하고 있습니다.
               </p>
             )}
 
@@ -137,8 +147,8 @@ export default function Home() {
         <aside className="practice-note">
           <span aria-hidden="true">✓</span>
           <p>
-            이번 주에는 <code>validateUrl</code> 함수를 완성해 입력값 검증을
-            구현합니다.
+            이번 주에는 입력 화면을 <code>/api/shorten</code>과 연결해
+            단축 주소를 생성합니다.
           </p>
         </aside>
       </section>

@@ -1,0 +1,108 @@
+import { createHash } from "node:crypto";
+import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+
+const MAX_URL_LENGTH = 2048;
+const ALPHABET =
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+// 원본 URL의 SHA-256 해시로 6자리 단축 코드를 생성합니다.
+function createShortCode(originalUrl, length = 6) {
+  const hex = createHash("sha256")
+    .update(originalUrl)
+    .digest("hex");
+
+  let code = "";
+
+  for (let i = 0; i < length; i++) {
+    const value = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    code += ALPHABET[value % ALPHABET.length];
+  }
+
+  return code;
+}
+
+export async function POST(request) {
+  try {
+    const body = await request.json().catch(() => null);
+    const raw = body?.originalUrl;
+    const originalUrl = typeof raw === "string" ? raw.trim() : "";
+
+    if (!originalUrl) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "MISSING_URL",
+            message: "URL을 입력해 주세요.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (originalUrl.length > MAX_URL_LENGTH) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "URL_TOO_LONG",
+            message: "URL은 2048자 이하로 입력해 주세요.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    let parsedUrl;
+
+    try {
+      parsedUrl = new URL(originalUrl);
+    } catch {
+      return NextResponse.json(
+        {
+          error: {
+            code: "INVALID_URL",
+            message: "올바른 URL 형식으로 입력해 주세요.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "INVALID_URL",
+            message: "URL은 http:// 또는 https://로 시작해야 합니다.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const shortCode = createShortCode(originalUrl);
+    const baseUrl = new URL(request.url).origin;
+
+    return NextResponse.json(
+      {
+        shortCode,
+        shortUrl: `${baseUrl}/${shortCode}`,
+        originalUrl,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Failed to create short URL", error);
+
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "단축 URL 생성 중 오류가 발생했습니다.",
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
