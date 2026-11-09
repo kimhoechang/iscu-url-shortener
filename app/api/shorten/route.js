@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { saveUrl } from "../../../lib/db";
 
 export const runtime = "nodejs";
 
@@ -7,7 +8,6 @@ const MAX_URL_LENGTH = 2048;
 const ALPHABET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
-// 원본 URL의 SHA-256 해시로 6자리 단축 코드를 생성합니다.
 function createShortCode(originalUrl, length = 6) {
   const hex = createHash("sha256")
     .update(originalUrl)
@@ -82,6 +82,10 @@ export async function POST(request) {
     }
 
     const shortCode = createShortCode(originalUrl);
+
+    // 단축 코드와 원본 URL을 Neon DB에 저장합니다.
+    await saveUrl(shortCode, originalUrl);
+
     const baseUrl = new URL(request.url).origin;
 
     return NextResponse.json(
